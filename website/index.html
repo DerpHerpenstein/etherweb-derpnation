@@ -3,46 +3,148 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta charset="UTF-8">
     <!-- jquery -->
-    <script src="derp://0xfb9bafe1cda7d30b4927c81047eda09a4dbeb8e4ce3cee3792dd9b5eae4f0c83/0x7cec8efcc600aaa53decab9106bd97fcdec817a42fd0650c2f74531e5698153a"></script>
+    <script src="https://code.jquery.com/jquery-3.6.3.min.js"></script>
     <!-- bulma -->
-    <link rel="stylesheet" href="derp://0x0e38a3ee02cddf1ecd370eed9937616ca347ae467023f704d8991090d981fd8f/0xaed9ac8797981170d20879074b6b58c63d12092ad41f47eabd39896814de5197">
-
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "derp://0x77b00b159f8bde237110c11cdd72827f7f997afa6df869fb6c998f118ebf9ab9/0x79db9d483a6155104d35f9871a2ad4fc322115a42ee09dea85fc3e2ed75660cf"
-        }
-      }
-    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css">
 
   </head>
 
     <body class="gradient">
-      <section class="container">
+      <nav class="navbar linagee"  role="navigation" aria-label="main navigation">
+          <div class="navbar-brand">
+            <a class="navbar-item">
+              <div class="logo-background">OGSwap.og</div>
+            </a>
+          </div>
 
-        <div class="columns is-centered">
-          <div class="column is-6">
-              <div>
-                <svg height="200" width="200">
-                  <circle cx="100" cy="100" r="70" stroke="black" stroke-width="3" fill="grey" />
-                </svg>
-              </div>
-              <div class="buttons are-medium">
-                <button class="button is-fullwidth">Bad</button>
-              </div>
-              <div class="buttons are-medium">
-                <button class="button is-fullwidth">Link</button>
-              </div>
-              <div class="buttons are-medium">
-                <button class="button is-fullwidth">Tree</button>
-              </div>
-              <div class="buttons are-medium">
-                <button id="test" class="button is-fullwidth">Clone</button>
-              </div>
+          <div id="navbarBasicExample" class="navbar-menu is-mobile">
+            <div class="navbar-start">
+              <a id="menu_home" data="content_home" class="navbar-item menu-item has-text-light">
+                Home
+              </a>
+              <a id="menu_list" data="content_list" class="navbar-item menu-item has-text-light">
+                List
+              </a>
+              <a id="menu_activity" data="content_activity" class="navbar-item menu-item has-text-light">
+                Activity
+              </a>
+              <a id="menu_about" data="content_about" class="navbar-item menu-item has-text-light">
+                About
+              </a>
+            </div>
 
+            <div class="navbar-end">
+              <div class="navbar-item">
+                <div class="buttons">
+                  <button id="connectWalletButton" class="button is-outlined m-3">
+                    Connect
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </nav>
+
+        <div id="content_home" class="main_content">
+          <div id="content_homeLoading" class="has-text-centered mt-5 has-text-light" >Grabbing data from blockchain<br><br>This may take a minute...</div>
+        </div>
+
+        <div id="content_list" class="main_content is-hidden">
+        </div>
+
+        <div id="content_activity" class="main_content is-hidden">
+          <div id="content_activityLoading" class="has-text-centered mt-5 has-text-light" >Grabbing data from blockchain<br><br>This may take a minute...</div>
+        </div>
+
+        <div id="content_about" class="main_content is-hidden">
+          <div class="box mt-5">
+            This webpage allows you to list normalized Linagee Domains for sale.<br><br>
+            This page is stored <u>entirely</u> on the Ethereum blockchain.<br><br>
+            It uses JQuery and Bulma which are also stored on the blockchain.
           </div>
         </div>
-      </section>
+
+
+
+
+
+
+        <script>
+          ///////////////////////////////////////////////
+          // MODAL //
+          ///////////////////////////////////////////////
+          document.addEventListener('DOMContentLoaded', () => {
+            // Functions to open and close a modal
+            function openModal($el) {
+              $el.classList.add('is-active');
+            }
+
+            function closeModal($el) {
+              $("#modal_confirm-button").addClass("is-hidden");
+              $("#modal_confirm-button").text("Confirm");
+              $el.classList.remove('is-active');
+            }
+
+            function closeAllModals() {
+              (document.querySelectorAll('.modal') || []).forEach(($modal) => {
+                closeModal($modal);
+              });
+            }
+
+            // Add a click event on buttons to open a specific modal
+            (document.querySelectorAll('.js-modal-trigger') || []).forEach(($trigger) => {
+              const modal = $trigger.dataset.target;
+              const $target = document.getElementById(modal);
+
+              $trigger.addEventListener('click', () => {
+                openModal($target);
+              });
+            });
+
+            // Add a click event on various child elements to close the parent modal
+            (document.querySelectorAll('.modal-background, .modal-close, .modal-card-head .delete, .modal-shut') || []).forEach(($close) => {
+              const $target = $close.closest('.modal');
+              $close.addEventListener('click', () => {
+                closeModal($target);
+              });
+            });
+
+            // Add a keyboard event to close all modals
+            document.addEventListener('keydown', (event) => {
+              const e = event || window.event;
+
+              if (e.keyCode === 27) { // Escape key
+                closeAllModals();
+              }
+            });
+          });
+          ///////////////////////////////////////////////
+          ///////////////////////////////////////////////
+        </script>
+
+        <button id="modal_button" class="js-modal-trigger is-hidden" data-target="modal-js-example">
+          Open JS example modal
+        </button>
+        <div id="modal-js-example" class="modal">
+          <div class="modal-background"></div>
+
+          <div class="modal-card">
+            <header class="modal-card-head">
+              <p id="modal_title" class="modal-card-title"></p>
+              <button class="delete" aria-label="close"></button>
+            </header>
+            <section class="modal-card-body">
+              <p id="modal_text" class="modal-card-title"></p>
+            </section>
+            <footer class="modal-card-foot">
+              <button id="modal_confirm-button" class="button is-dark is-yellow is-hidden">Confirm</button>
+              <button id="modal_close-button" class="button modal-shut">Close</button>
+            </footer>
+          </div>
+
+          <button class="modal-close is-large" aria-label="close"></button>
+        </div>
+
     </body>
 
 </html>
