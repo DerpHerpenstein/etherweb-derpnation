@@ -10,15 +10,214 @@ let derpAddress = "0x06A07A3911dAb4507dD44cd97e30c3267d4a9c63";
 let derpContract = new og.ethers.Contract(derpAddress, derpAbi, og.signer);
 
 
-let newContent = false;
+let newContent = true;
 
 function getDerpImages(){
 
 }
 
-function updateUI(){
-  if(newContent){
+async function getSomeEvents(contract, filter, blockStart, blockEnd){
+  try{
+    let results = await contract.queryFilter(filter, blockStart, blockEnd);
+    let organized = new Map();
+    for(let i=0; i<results.length; i++){
+      //console.log(results[i]);
+      const tokenId = parseInt(results[i].args["tokenId"].toString());
+      organized.set(tokenId,results[i]);
+    }
+    return organized;
+  }
+  catch(e){
+    // TOTO : ensure this catches the correct error, otherwise its just a ddos machine
+    if(blockEnd-blockStart < 512)
+      throw "STOP THE DDOS???";
+    else{
+      let half =  Math.ceil((blockEnd-blockStart) / 2);
+      let resultsTop = await contract.queryFilter(filter, blockStart, blockStart+half);
+      let resultsBottom = await contract.queryFilter(filter, blockEnd-half, blockEnd);
+      return new Map([resultsBottom, resultsTop]);
+    }
+  }
+}
+
+let vaultState = {currentBlock: 0};
+
+// call getEvents to get the current state, then call it to update the state
+async function getEvents(startBlock, currentBlock){
+  try{
+    vaultState.allTokens = {};
+    const transferFilter = await derpContract.filters.Transfer();
+    const mintToVaultFilter = await derpContract.filters.Transfer(null, derpAddress);
+    const soldToVaultFilter = await derpContract.filters.SoldToVault();
+    const boughtFromVaultFilter = await derpContract.filters.BoughtFromVault();
+    const issueLoanFilter = await derpContract.filters.IssueLoan();
+    const loanPaidFilter = await derpContract.filters.LoanPaidInFull();
+
+    let transfers = await getSomeEvents(derpContract, transferFilter, startBlock, currentBlock);
+    let mintToVault = await getSomeEvents(derpContract, mintToVaultFilter, startBlock, currentBlock);
+    let soldToVault = await getSomeEvents(derpContract, soldToVaultFilter, startBlock, currentBlock);
+    let boughtFromVault = await getSomeEvents(derpContract, boughtFromVaultFilter, startBlock, currentBlock);
+    let issuedLoans = await getSomeEvents(derpContract, issueLoanFilter, startBlock, currentBlock);
+    let paidLoans = await getSomeEvents(derpContract, loanPaidFilter, startBlock, currentBlock);
+
+    function getBlockAndLog(tx){
+      return tx.blockNumber*1000000+tx.logIndex
+    }
+
+    function updateVaultState(stateName, value,key,map){
+      let currentBlockAndLog = getBlockAndLog(value);
+      if(!vaultState[key] || currentBlockAndLog > vaultState[key].blkAndLog){
+        let dataObj = {
+          transactionHash: value.transactionHash,
+          args: value.args
+        }
+        vaultState.allTokens[key] = {"state":stateName, "blkAndLog": currentBlockAndLog, data: dataObj};
+      }
+    }
+
+    // go over all transfers to the vault and mark the state as toVault if its newer than current blockAndLog
+    // this should get all the latest transfers in
+    // then go through each buy from the vault, issued loan and paid load
+    // this should have the current vault NFT state
+    transfers.forEach(function(value,key,map){
+      updateVaultState("transfer", value, key, map)
+    });
     
+    mintToVault.forEach(function(value,key,map){
+      updateVaultState("mintToVault", value, key, map)
+    });
+
+    soldToVault.forEach(function(value,key,map){
+      updateVaultState("soldToVault", value, key, map)
+    });
+
+    boughtFromVault.forEach(function(value,key,map){
+      updateVaultState("boughtFromVault", value, key, map)
+    });
+
+    issuedLoans.forEach(function(value,key,map){
+      updateVaultState("issuedLoan", value, key, map)
+    });
+
+    paidLoans.forEach(function(value,key,map){
+      updateVaultState("paidLoan", value, key, map)
+    });
+    vaultState.currentBlock = currentBlock;
+    
+  }
+  catch(e){
+    console.log("Error getting all results?", e);
+  }
+}
+
+// goes through the vault state and determiness vault tokens, user tokens, user loans and all loans
+async function updateUserData(){
+  var walletAddress = await og.signer.getAddress();
+  vaultState.userTokens = {};
+  vaultState.vaultTokens = {};
+  vaultState.userLoans = {};
+  vaultState.allLoans = {};
+
+  for (const [tokenId, tokenData] of Object.entries(vaultState.allTokens)) {
+    switch(tokenData.state){
+      case "mintToVault": 
+      case "soldToVault": vaultState.vaultTokens[tokenId] = tokenData;
+                          break;
+                      
+      case "transfer":  if(walletAddress === tokenData.data.args.to)
+                          vaultState.userTokens[tokenId] = tokenData;
+                        break;
+      
+       case "issuedLoan": if(walletAddress === tokenData.data.args.user)
+                            vaultState.userLoans[tokenId] = tokenData;  
+                          else
+                            vaultState.allLoans[tokenId] = tokenData;
+                          break;
+    }
+  }
+
+  let tempKeys = Object.keys(vaultState.vaultTokens);
+  $("#vault_user_buy_list").text("");
+  for(let i=0; i<tempKeys.length; i++){
+    $("#vault_user_buy_list").append(`
+      <div class="card" style="display:inline-block;padding:0.2rem;>
+        <div class="card-content">
+          <div class="media">
+            <div class="media-left">
+              <figure class="image is-96x96">
+                <img src="https://bulma.io/images/placeholders/96x96.png" alt="Placeholder image">
+              </figure>
+            </div>
+            <div class="media-content">
+              <p class="title is-5">#${tempKeys[i]}</p>
+              <p class="subtitle is-5"><div class="button is-pulled-right" value="${tempKeys[i]}">Buy</div></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    `);
+  }
+
+  tempKeys = Object.keys(vaultState.userTokens);
+  $("#vault_user_sell_list").text("");
+  for(let i=0; i<tempKeys.length; i++){
+    $("#loan_user_loan_list").append(`
+    <div class="card" style="display:inline-block;padding:0.2rem;>
+      <div class="card-content">
+        <div class="media">
+          <div class="media-left">
+            <figure class="image is-96x96">
+              <img src="https://bulma.io/images/placeholders/96x96.png" alt="Placeholder image">
+            </figure>
+          </div>
+          <div class="media-content">
+            <p class="title is-5">#${tempKeys[i]}</p>
+            <p class="subtitle is-5"><div class="button is-pulled-right" value="${tempKeys[i]}">Take Loan</div></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+
+    $("#vault_user_sell_list").append(`
+      <div class="card" style="display:inline-block;padding:0.2rem;>
+        <div class="card-content">
+          <div class="media">
+            <div class="media-left">
+              <figure class="image is-96x96">
+                <img src="https://bulma.io/images/placeholders/96x96.png" alt="Placeholder image">
+              </figure>
+            </div>
+            <div class="media-content">
+              <p class="title is-5">#${tempKeys[i]}</p>
+              <p class="subtitle is-5"><div class="button is-pulled-right" value="${tempKeys[i]}">Sell</div></p>
+            </div>
+          </div>
+        </div>
+      </div>
+  `);
+  }
+
+  //Update the vault info
+  vaultState.mintCount = (await derpContract.totalSupply()).toNumber();
+  vaultState.balance = parseFloat(og.ethers.utils.formatEther((await og.provider.getBalance(derpAddress))));
+  vaultState.buyPrice = 1.01*parseFloat(og.ethers.utils.formatEther((await derpContract.getUserBuyPrice())));
+  vaultState.sellPrice = 0.99*parseFloat(og.ethers.utils.formatEther((await derpContract.getUserSellPrice())));
+  $("#vault_balance").text(vaultState.balance);
+  $("#mint_derp_counter").text("" + vaultState.mintCount);
+  $("#vault_user_buy_price").text("Buy From Vault: " + vaultState.buyPrice +" ETH");
+  $("#vault_user_sell_price").text("Sell To Vault: " + vaultState.sellPrice +" ETH");
+  console.log(vaultState);
+}
+
+
+
+async function updateUI(){
+  if(newContent){
+    const currentBlock = (await og.provider.getBlockNumber() );
+    await getEvents(14363280, currentBlock);
+    await updateUserData();
+
     newContent = false;
   }
   setTimeout(updateUI,1000);
@@ -27,8 +226,9 @@ function updateUI(){
 $(document).on('click', '#mint_derp_button', async function(){
  try{
   const selected = $("#mint_count_select").find(":selected").text();
-  const options = {value: og.ethers.utils.parseEther((0.025*parseInt(selected)).toString() )};
-  console.log(options);
+  const cost = ["0", "0.025", "0.05", "0.075", "0.1", "0.125"]
+  const options = {value: og.ethers.utils.parseEther(cost[parseInt(selected)] )};
+  console.log(cost[parseInt(selected)]);
 
   const submittedTx = await derpContract.mint(selected, options);
   const txReceipt = await submittedTx.wait();

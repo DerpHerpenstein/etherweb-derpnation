@@ -79,13 +79,50 @@
           </div>
         </div>
 
-        <div id="content_list" class="main_content is-hidden">
-          <div class="tabs is-boxed">
-            <ul>
-              <li class="is-active"><a><span>Add Listing</span></a></li>
-              <li><a><span>Remove Listing</span></a></li>
-              <li><a><span>Check Name</span></a></li>
-            </ul>
+        <div id="content_vault" class="main_content is-hidden">
+          <div class="box m-5">
+            <span class="title">Derp Vault</span><br>
+            <p>The Derp Vault is an automatic market maker with permanent buy side liquidity built into the ERC721 smart contract.<br>
+            </p>
+            <p>The vault enforces a spread between buy and sell prices at all times.</p>
+            <p>After the vault collateralizes all 20k NFTs at 50% of mint price, price discovery begins</p>
+            <span class="is-size-6"><i>Note: If you have issues with this site, send me a <a href="https://twitter.com/0xDerpNation" target="_blank">tweet</a> and try the original <a href="https://www.derpnation.xyz/vault" target="_blank">vault</a></span> </i>
+          </div>
+
+          <div class="box m-5">
+            <span class="title">Automatic Market Maker</span><br>
+            <div id="vault_value_label">Vault Value: <span id="vault_balance">??</span> ETH</div><br>
+            <div id="vault_container" class="columns">
+              <div class="column">
+                <div id="vault_user_buy_price"></div>
+                <div id="vault_user_buy_list" style="height:20rem; overflow:auto;"></div>
+              </div>
+              <div class="column">
+                <div id="vault_user_sell_price"></div>
+                <div id="vault_user_sell_list" style="height:20rem; overflow:auto;"></div>
+              </div>
+            </div>
+            <br>
+          </div>
+
+          <div class="box m-5">
+            <h3 class="title">Loan Provider</h3>
+            <p>Loan principle is 25% of the current Derp Nation Vault buy price with an interest rate of 7.2% and a duration of 1,068,000 blocks. (173 days @ 14 second blocks)
+              Loans must be paid as one lump sum and can be paid any time.</p>
+            <hr>
+            <p>Unpaid loans beyond their term are claimable by anyone willing to pay the balance.</p>
+            <hr>
+            <p>Current Loan Principle per DERP: <a id="loan_principle"></a></p>
+            <div id="loan_container" class="columns">
+              <div class="column">
+                <div id="loan_user_buy_price"></div>
+                <div id="loan_user_buy_list" style="height:20rem; overflow:auto;"></div>
+              </div>
+              <div class="column">
+                <div id="loan_user_loan_price"></div>
+                <div id="loan_user_loan_list" style="height:20rem; overflow:auto;"></div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -109,7 +146,7 @@
               Created Templates for making development of decentralized websites easy. 
               <a href="https://github.com/DerpHerpenstein/lnr-web-template" target="_blank">Vanilla (HTML, CSS, JS)</a> and 
               <a href="https://github.com/DerpHerpenstein/lnr-web-template-solidjs" target="_blank">SolidJS</a><br>
-              <i>Note: <a href="https://github.com/mkeresty/lnr-web-template-solidjs" target="_blank">mkeresty</a> is actively updating the template</i>
+              <i>Note: <a href="https://github.com/mkeresty/lnr-web-template-solidjs" target="_blank">mkeresty</a> is actively maintaining the SolidJS template</i>
             </p>
 
             <p><br>
