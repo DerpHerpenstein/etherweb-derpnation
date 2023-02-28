@@ -11,8 +11,43 @@ let derpContract = new og.ethers.Contract(derpAddress, derpAbi, og.signer);
 
 
 let newContent = true;
+let derpImages;
 
-function getDerpImages(){
+async function updateRandomDerp(){
+  $("#random_derp").html(await getDerpSVG(0));
+  setTimeout(updateRandomDerp, 1000);
+}
+
+async function getDerpSVG(tokenId){
+  let traits;
+  if(tokenId > 0)
+    traits = await derpContract.getNftTraits(tokenId);
+  else
+    traits = [Math.floor(Math.random() * 15),Math.floor(Math.random() * 15),Math.floor(Math.random() * 15),Math.floor(Math.random() * 15)];
+
+  return `
+  <svg viewBox="0 0 128 128" width="96">
+  <image x="0" y="0" width="128" height="128" xlink:href="data:image/png;base64, ${derpImages[0][traits[0]]}" />
+  <image x="0" y="0" width="128" height="128" xlink:href="data:image/png;base64, ${derpImages[1][traits[1]]}" />
+  <image x="0" y="0" width="128" height="128" xlink:href="data:image/png;base64, ${derpImages[2][traits[2]]}" />
+  <image x="0" y="0" width="128" height="128" xlink:href="data:image/png;base64, ${derpImages[3][traits[3]]}" />
+  </svg>
+  `;
+}
+
+async function getDerpImages(){
+  const nftDataHash = "0x29e0da9b50de6bb95f1f74f455e5ee4e7157ecba1094281133e7bd4e1d65be1d";
+  try{
+    let tx = await og.provider.getTransaction(nftDataHash);
+    let input_data = '0x' + tx.data.slice(10);
+    let iface = new og.ethers.utils.Interface(derpAbi);
+    let decodedData = iface.parseTransaction({ data: tx.data, value: tx.value });
+    let params = decodedData.args;
+    derpImages = params;
+  }
+  catch(e){
+    throw "Error loading images!";
+  }
 
 }
 
@@ -145,12 +180,12 @@ async function updateUserData(){
           <div class="media">
             <div class="media-left">
               <figure class="image is-96x96">
-                <img src="https://bulma.io/images/placeholders/96x96.png" alt="Placeholder image">
+                ${await getDerpSVG(tempKeys[i])}
               </figure>
             </div>
             <div class="media-content">
               <p class="title is-5">#${tempKeys[i]}</p>
-              <p class="subtitle is-5"><div class="button is-pulled-right" value="${tempKeys[i]}">Buy</div></p>
+              <p class="subtitle is-5"><div class="buy_from_vault_button button is-pulled-right" value="${tempKeys[i]}">Buy</div></p>
             </div>
           </div>
         </div>
@@ -167,7 +202,7 @@ async function updateUserData(){
         <div class="media">
           <div class="media-left">
             <figure class="image is-96x96">
-              <img src="https://bulma.io/images/placeholders/96x96.png" alt="Placeholder image">
+              ${await getDerpSVG(tempKeys[i])}
             </figure>
           </div>
           <div class="media-content">
@@ -185,12 +220,12 @@ async function updateUserData(){
           <div class="media">
             <div class="media-left">
               <figure class="image is-96x96">
-                <img src="https://bulma.io/images/placeholders/96x96.png" alt="Placeholder image">
+                ${await getDerpSVG(tempKeys[i])}
               </figure>
             </div>
             <div class="media-content">
               <p class="title is-5">#${tempKeys[i]}</p>
-              <p class="subtitle is-5"><div class="button is-pulled-right" value="${tempKeys[i]}">Sell</div></p>
+              <p class="subtitle is-5"><div class="sell_to_vault_button button is-pulled-right" value="${tempKeys[i]}">Sell</div></p>
             </div>
           </div>
         </div>
@@ -223,6 +258,63 @@ async function updateUI(){
   setTimeout(updateUI,1000);
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+$(document).on('click', '.sell_to_vault_button', async function(){
+  try{
+    let tokenId = $(this).attr("value");
+
+    const submittedTx = await derpContract.sellToken(tokenId, og.ethers.utils.parseEther(""+vaultState.sellPrice));
+    const txReceipt = await submittedTx.wait();
+      if (txReceipt.status === 0)
+          throw new Error("Approve transaction failed");
+      else{
+        $("#modal_title").html("Congratulations");
+        $("#modal_text").html("Derp Nation #" + tokenId + " has been sold");
+        $("#modal_button").click();
+      }
+   }
+   catch(e){
+    $("#modal_title").html("Error - Sell Failed");
+    $("#modal_text").text(e.message);
+    $("#modal_button").click();
+  }
+});
+
+
+$(document).on('click', '.buy_from_vault_button', async function(){
+  try{
+    let tokenId = $(this).attr("value");
+    const options = {value: og.ethers.utils.parseEther(""+vaultState.buyPrice)};
+
+    const submittedTx = await derpContract.buyToken(tokenId, options);
+    const txReceipt = await submittedTx.wait();
+      if (txReceipt.status === 0)
+          throw new Error("Approve transaction failed");
+      else{
+        $("#modal_title").html("Congratulations");
+        $("#modal_text").html("Derp Nation #" + tokenId + " is now yours");
+        $("#modal_button").click();
+      }
+   }
+   catch(e){
+    $("#modal_title").html("Error - Buy Failed");
+    $("#modal_text").text(e.message);
+    $("#modal_button").click();
+  }
+});
+
+
 $(document).on('click', '#mint_derp_button', async function(){
  try{
   const selected = $("#mint_count_select").find(":selected").text();
@@ -242,8 +334,10 @@ $(document).on('click', '#mint_derp_button', async function(){
 }
 });
 
-$(document).ready(function(){
+$(document).ready(async function(){
   $("#connectWalletButton").click();
+  await getDerpImages();
+  await updateRandomDerp();
   //getAllEvents();
   updateUI();
 });
