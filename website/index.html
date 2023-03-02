@@ -82,7 +82,7 @@
         <div id="content_vault" class="main_content is-hidden">
           <div class="box m-5">
             <span class="title">Derp Vault</span><br>
-            <p>The Derp Vault is an automatic market maker with permanent buy side liquidity built into the ERC721 smart contract.<br>
+            <p>The Derp Vault is an experiment that uses 80% of mint funds to establish an automatic market maker and loan provider inside of the ERC721 smart contract.<br>
             </p>
             <p>The vault enforces a spread between buy and sell prices at all times.</p>
             <p>After the vault collateralizes all 20k NFTs at 50% of mint price, price discovery begins</p>
@@ -112,11 +112,11 @@
             <hr>
             <p>Unpaid loans beyond their term are claimable by anyone willing to pay the balance.</p>
             <hr>
-            <p>Current Loan Principle per DERP: <a id="loan_principle"></a></p>
+            <p>Current Loan Principle per DERP: <span id="loan_principle"> eth</span></p>
             <div id="loan_container" class="columns">
               <div class="column">
                 <div id="loan_user_buy_price"></div>
-                <div id="loan_user_buy_list" style="height:20rem; overflow:auto;"></div>
+                <div id="loan_outstanding_loan_list" style="height:20rem; overflow:auto;"></div>
               </div>
               <div class="column">
                 <div id="loan_user_loan_price"></div>

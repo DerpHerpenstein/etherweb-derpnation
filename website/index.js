@@ -77,6 +77,22 @@ async function getSomeEvents(contract, filter, blockStart, blockEnd){
 
 let vaultState = {currentBlock: 0};
 
+function getBlockAndLog(tx){
+  return tx.blockNumber*1000000+tx.logIndex
+}
+
+function updateVaultState(stateName, value,key,map){
+  let currentBlockAndLog = getBlockAndLog(value);
+  if(vaultState.allTokens[key] == undefined || currentBlockAndLog > vaultState.allTokens[key].blkAndLog || stateName==="MintToVault"){
+    newContent = true;
+    let dataObj = {
+      transactionHash: value.transactionHash,
+      args: value.args
+    }
+    vaultState.allTokens[key] = {"state":stateName, "blkAndLog": currentBlockAndLog, data: dataObj};
+  }
+}
+
 // call getEvents to get the current state, then call it to update the state
 async function getEvents(startBlock, currentBlock){
   try{
@@ -95,53 +111,54 @@ async function getEvents(startBlock, currentBlock){
     let issuedLoans = await getSomeEvents(derpContract, issueLoanFilter, startBlock, currentBlock);
     let paidLoans = await getSomeEvents(derpContract, loanPaidFilter, startBlock, currentBlock);
 
-    function getBlockAndLog(tx){
-      return tx.blockNumber*1000000+tx.logIndex
-    }
-
-    function updateVaultState(stateName, value,key,map){
-      let currentBlockAndLog = getBlockAndLog(value);
-      if(!vaultState[key] || currentBlockAndLog > vaultState[key].blkAndLog){
-        let dataObj = {
-          transactionHash: value.transactionHash,
-          args: value.args
-        }
-        vaultState.allTokens[key] = {"state":stateName, "blkAndLog": currentBlockAndLog, data: dataObj};
-      }
-    }
-
     // go over all transfers to the vault and mark the state as toVault if its newer than current blockAndLog
     // this should get all the latest transfers in
     // then go through each buy from the vault, issued loan and paid load
     // this should have the current vault NFT state
     transfers.forEach(function(value,key,map){
-      updateVaultState("transfer", value, key, map)
+      updateVaultState("Transfer", value, key, map)
     });
     
     mintToVault.forEach(function(value,key,map){
-      updateVaultState("mintToVault", value, key, map)
+      updateVaultState("MintToVault", value, key, map)
     });
 
     soldToVault.forEach(function(value,key,map){
-      updateVaultState("soldToVault", value, key, map)
+      updateVaultState("SoldToVault", value, key, map)
     });
 
     boughtFromVault.forEach(function(value,key,map){
-      updateVaultState("boughtFromVault", value, key, map)
+      updateVaultState("BoughtFromVault", value, key, map)
     });
 
     issuedLoans.forEach(function(value,key,map){
-      updateVaultState("issuedLoan", value, key, map)
+      updateVaultState("IssueLoan", value, key, map)
     });
-
+    
     paidLoans.forEach(function(value,key,map){
-      updateVaultState("paidLoan", value, key, map)
+      updateVaultState("LoanPaidInFull", value, key, map)
     });
     vaultState.currentBlock = currentBlock;
     
   }
   catch(e){
     console.log("Error getting all results?", e);
+  }
+}
+
+function timeConversion(sec) {
+  var seconds = (sec).toFixed(1);
+  var minutes = (sec / (60)).toFixed(1);
+  var hours = (sec / (60 * 60)).toFixed(1);
+  var days = (sec / (60 * 60 * 24)).toFixed(1);
+  if (seconds < 60) {
+      return seconds + " Sec";
+  } else if (minutes < 60) {
+      return minutes + " Min";
+  } else if (hours < 24) {
+      return hours + " Hrs";
+  } else {
+      return days + " Days"
   }
 }
 
@@ -155,15 +172,17 @@ async function updateUserData(){
 
   for (const [tokenId, tokenData] of Object.entries(vaultState.allTokens)) {
     switch(tokenData.state){
-      case "mintToVault": 
-      case "soldToVault": vaultState.vaultTokens[tokenId] = tokenData;
+      case "MintToVault": 
+      case "SoldToVault": vaultState.vaultTokens[tokenId] = tokenData;
                           break;
-                      
-      case "transfer":  if(walletAddress === tokenData.data.args.to)
+
+      case "BoughtFromVault":      
+      case "LoanPaidInFull":          
+      case "Transfer":  if(walletAddress === tokenData.data.args.to || walletAddress === tokenData.data.args.user || walletAddress === tokenData.data.args.debtor)
                           vaultState.userTokens[tokenId] = tokenData;
                         break;
       
-       case "issuedLoan": if(walletAddress === tokenData.data.args.user)
+       case "IssueLoan": if(walletAddress === tokenData.data.args.debtor)
                             vaultState.userLoans[tokenId] = tokenData;  
                           else
                             vaultState.allLoans[tokenId] = tokenData;
@@ -193,7 +212,85 @@ async function updateUserData(){
     `);
   }
 
+  $("#loan_outstanding_loan_list").text("");
+  
+  let tableText = `
+    <table class="table">
+      <thead>
+        <tr>
+          <th>NFT Id</th>
+          <th>Debtor</th>
+          <th>Image</th>
+          <th>Balance</th>
+          <th>Loan due</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  let currentBlock = (await og.provider.getBlockNumber() );
+  tempKeys = Object.keys(vaultState.userLoans);
+  for(let i=0; i<tempKeys.length; i++){
+    try{
+    let loanValueBN = vaultState.userLoans[tempKeys[i]].data.args.value;
+    let loanBlockNumber = parseInt(vaultState.userLoans[tempKeys[i]].blkAndLog/1000000);
+    let loanValue = vaultState.userLoans[tempKeys[i]].data.args.value.toHexString();
+    let loanEnds = loanBlockNumber + (44500*24);
+    tableText += `
+      <tr>
+        <td>#${tempKeys[i]}</td>
+        <td>You</td>
+        <td>
+          <svg viewBox="0 0 96 96" width="48">
+            ${await getDerpSVG(tempKeys[i])}
+          </svg>
+        </td>
+        <td>${og.ethers.utils.formatEther(loanValueBN)}eth</td>
+        <td>${ timeConversion((loanEnds-currentBlock)*14)} </td>
+        <td><button class="button pay_loan_button" value="${tempKeys[i]}" loanvalue="${loanValue}">Pay Loan</button></td>
+      </tr>
+    `;
+    }
+    catch(e){
+      console.log(e);
+    }
+  }
+  tempKeys = Object.keys(vaultState.allLoans);
+  for(let i=0; i<tempKeys.length; i++){
+    try{
+      let loanValueBN = vaultState.allLoans[tempKeys[i]].data.args.value;
+      let loanBlockNumber = parseInt(vaultState.allLoans[tempKeys[i]].blkAndLog/1000000);
+      let loanValue = vaultState.allLoans[tempKeys[i]].data.args.value.toHexString();
+      let loanEnds = loanBlockNumber + (44500*24);
+      
+      let buttonText = `<button class="button pay_loan_button" value="${tempKeys[i]}" loanvalue="${loanValue}">Pay Loan</button>`;
+      tableText += `
+        <tr>
+          <td>#${tempKeys[i]}</td>
+          <td>Not You</td>
+          <td>
+            <svg viewBox="0 0 96 96" width="48">
+              ${await getDerpSVG(tempKeys[i])}
+            </svg>
+          </td>
+          <td>${og.ethers.utils.formatEther(loanValueBN)}eth</td>
+          <td>${ timeConversion((loanEnds-currentBlock)*14)} </td>
+          <td>${loanEnds <= currentBlock ? buttonText : ""}</td>
+        </tr>
+      `;
+    }
+    catch(e){
+      console.log(e);
+    }
+  }
+  tableText +="</tbody></table>";
+
+  $("#loan_outstanding_loan_list").append(tableText);
+  
+
   tempKeys = Object.keys(vaultState.userTokens);
+  $("#loan_user_loan_list").text("");
   $("#vault_user_sell_list").text("");
   for(let i=0; i<tempKeys.length; i++){
     $("#loan_user_loan_list").append(`
@@ -207,7 +304,7 @@ async function updateUserData(){
           </div>
           <div class="media-content">
             <p class="title is-5">#${tempKeys[i]}</p>
-            <p class="subtitle is-5"><div class="button is-pulled-right" value="${tempKeys[i]}">Take Loan</div></p>
+            <p class="subtitle is-5"><div class="take_loan_button button is-pulled-right" value="${tempKeys[i]}">Take Loan</div></p>
           </div>
         </div>
       </div>
@@ -239,23 +336,19 @@ async function updateUserData(){
   vaultState.buyPrice = 1.01*parseFloat(og.ethers.utils.formatEther((await derpContract.getUserBuyPrice())));
   vaultState.sellPrice = 0.99*parseFloat(og.ethers.utils.formatEther((await derpContract.getUserSellPrice())));
   $("#vault_balance").text(vaultState.balance);
+  $("#loan_principle").text(vaultState.sellPrice/4);
   $("#mint_derp_counter").text("" + vaultState.mintCount);
   $("#vault_user_buy_price").text("Buy From Vault: " + vaultState.buyPrice +" ETH");
   $("#vault_user_sell_price").text("Sell To Vault: " + vaultState.sellPrice +" ETH");
   console.log(vaultState);
 }
 
-
-
 async function updateUI(){
   if(newContent){
-    const currentBlock = (await og.provider.getBlockNumber() );
-    await getEvents(14363280, currentBlock);
     await updateUserData();
-
     newContent = false;
   }
-  setTimeout(updateUI,1000);
+  setTimeout(updateUI,500);
 }
 
 
@@ -267,7 +360,27 @@ async function updateUI(){
 
 
 
-
+$(document).on('click', '.pay_loan_button', async function(){
+  try{
+    let tokenId = $(this).attr("value");
+    let loanValue = og.ethers.BigNumber.from($(this).attr("loanvalue"));
+    const options = {value: loanValue};
+    const submittedTx = await derpContract.payLoan(tokenId,options);
+    const txReceipt = await submittedTx.wait();
+      if (txReceipt.status === 0)
+          throw new Error("Approve transaction failed");
+      else{
+        $("#modal_title").html("Congratulations");
+        $("#modal_text").html("Your loan for Derp Nation #" + tokenId + " has been paid");
+        $("#modal_button").click();
+      }
+   }
+   catch(e){
+    $("#modal_title").html("Error - Pay Loan Failed");
+    $("#modal_text").text(e.message);
+    $("#modal_button").click();
+  }
+});
 
 
 $(document).on('click', '.sell_to_vault_button', async function(){
@@ -286,6 +399,27 @@ $(document).on('click', '.sell_to_vault_button', async function(){
    }
    catch(e){
     $("#modal_title").html("Error - Sell Failed");
+    $("#modal_text").text(e.message);
+    $("#modal_button").click();
+  }
+});
+
+$(document).on('click', '.take_loan_button', async function(){
+  try{
+    let tokenId = $(this).attr("value");
+
+    const submittedTx = await derpContract.takeLoan(tokenId);
+    const txReceipt = await submittedTx.wait();
+      if (txReceipt.status === 0)
+          throw new Error("Approve transaction failed");
+      else{
+        $("#modal_title").html("Congratulations");
+        $("#modal_text").html("You took out a loan against Derp Nation #" + tokenId);
+        $("#modal_button").click();
+      }
+   }
+   catch(e){
+    $("#modal_title").html("Error - Take Loan Failed");
     $("#modal_text").text(e.message);
     $("#modal_button").click();
   }
@@ -316,22 +450,22 @@ $(document).on('click', '.buy_from_vault_button', async function(){
 
 
 $(document).on('click', '#mint_derp_button', async function(){
- try{
-  const selected = $("#mint_count_select").find(":selected").text();
-  const cost = ["0", "0.025", "0.05", "0.075", "0.1", "0.125"]
-  const options = {value: og.ethers.utils.parseEther(cost[parseInt(selected)] )};
-  console.log(cost[parseInt(selected)]);
+  try{
+    const selected = $("#mint_count_select").find(":selected").text();
+    const cost = ["0", "0.025", "0.05", "0.075", "0.1", "0.125"]
+    const options = {value: og.ethers.utils.parseEther(cost[parseInt(selected)] )};
+    console.log(cost[parseInt(selected)]);
 
-  const submittedTx = await derpContract.mint(selected, options);
-  const txReceipt = await submittedTx.wait();
-    if (txReceipt.status === 0)
-        throw new Error("Approve transaction failed");
- }
- catch(e){
-  $("#modal_title").html("Error - Mint Failed");
-  $("#modal_text").text(e.message);
-  $("#modal_button").click();
-}
+    const submittedTx = await derpContract.mint(selected, options);
+    const txReceipt = await submittedTx.wait();
+      if (txReceipt.status === 0)
+          throw new Error("Approve transaction failed");
+  }
+  catch(e){
+    $("#modal_title").html("Error - Mint Failed");
+    $("#modal_text").text(e.message);
+    $("#modal_button").click();
+  }
 });
 
 $(document).ready(async function(){
@@ -339,7 +473,30 @@ $(document).ready(async function(){
   await getDerpImages();
   await updateRandomDerp();
   //getAllEvents();
+  const currentBlock = (await og.provider.getBlockNumber() );
+  await getEvents(14363280, currentBlock);
   updateUI();
+ 
+  derpContract.on("Transfer", (...args)  => {
+    const event = args[args.length - 1];
+    updateVaultState("Transfer", event, parseInt(event.args["tokenId"].toString()));
+  });
+  derpContract.on("SoldToVault", (...args)  => {
+    const event = args[args.length - 1];
+    updateVaultState("SoldToVault", event, parseInt(event.args["tokenId"].toString()));
+  });
+  derpContract.on("BoughtFromVault", (...args)  => {
+    const event = args[args.length - 1];
+    updateVaultState("BoughtFromVault", event, parseInt(event.args["tokenId"].toString()));
+  });
+  derpContract.on("IssueLoan", (...args)  => {
+    const event = args[args.length - 1];
+    updateVaultState("IssueLoan", event, parseInt(event.args["tokenId"].toString()));
+  });
+  derpContract.on("LoanPaidInFull", (...args)  => {
+    const event = args[args.length - 1];
+    updateVaultState("LoanPaidInFull", event, parseInt(event.args["tokenId"].toString()));
+  });
 });
 
 $(document).on('click', '.menu-item', async function(){
