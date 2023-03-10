@@ -348,6 +348,8 @@ async function updateUserData(){
 
   if(tempKeys.length > 0)
     $("#home_derps").text("");
+  else
+    $("#home_derps").text("You do not have any derps...");
 
   for(let i=0; i<tempKeys.length; i++){
     $("#loan_user_loan_list").append(`
@@ -449,10 +451,6 @@ async function updateUI(){
     await setupUI();
   }
   setTimeout(updateUI,500);
-}
-
-async function redirect(domain){
-  
 }
 
 $(document).on('click', '.derp_link',async function (){
