@@ -670,6 +670,7 @@ $(document).ready(async function(){
 });
 
 $(document).on('click', '.menu-item', async function(){
+  $("#main_navbar").toggleClass("is-active");
   let tmpData = $(this).attr("data");
   $(".main_content").addClass("is-hidden");
   $("#"+tmpData).removeClass("is-hidden");
@@ -690,4 +691,18 @@ $(document).on('click', '#connectWalletButton', async function(){
     $("#modal_text").text(e.message);
     $("#modal_button").click();
   }
+});
+
+$(document).on('click', '.navbar-burger', function(){
+  $("#main_navbar").toggleClass("is-active");
+});
+
+$(document).on('click', '.modal-background, .modal-close, .modal-card-head .delete, .modal-shut', function(){
+  $("#modal_confirm-button").addClass("is-hidden");
+  $("#modal_confirm-button").text("Confirm");
+  $("#modal-js-example").removeClass('is-active');
+});
+
+$(document).on('click', '#modal_button', function(){
+  $("#modal-js-example").addClass('is-active');
 });
