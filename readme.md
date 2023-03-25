@@ -1,11 +1,12 @@
-# lnr-web-template
 <p align="center">
-  <img src="https://github.com/Linagee-Name-Registrar/Brand-Kit/blob/main/icon/svg/lnr_icon_box.svg" alt="LNR Logo" width=33% height=33%>
+  <img src="derpnation.png" alt="Derp Nation" width=33% height=33%>
 </p>
 
-!!!needs alot of work!!!
+## DerpNation.og - etherweb-derpnation
 
-Hacked together a functional single page on-chain website uploader and browser.
+This is the on chain site for Derp Nation.  Mint, buy/sell and take loans on your Derp Nation PFPs.
+
+Visit the on chain website with the etherweb portal: [derpnation.og](https://web.linagee.vision/og/derpnation.og)
 
 <!-- CONTACT -->
 ## Contact
